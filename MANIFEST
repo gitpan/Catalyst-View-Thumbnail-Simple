@@ -1,0 +1,6 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/Catalyst-View-Thumbnail-Simple.t
+lib/Catalyst/View/Thumbnail/Simple.pm
