@@ -7,7 +7,7 @@ use base 'Catalyst::View';
 use Imager;
 use Image::Info qw/image_info/;
 
-our $VERSION = 0.0002;
+our $VERSION = 0.0003;
 
 sub process {
     my ($self, $c) = @_;
