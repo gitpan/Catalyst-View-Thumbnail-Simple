@@ -1,6 +1,9 @@
 Revision history for Perl extension Catalyst::View::Thumbnail::Simple.
 
-0.01  Sat Mar 19 22:42:39 2011
+0.0001  Sat Mar 19 22:42:39 2011
 	- original version; created by h2xs 1.23 with options
 		-X -n Catalyst::View::Thumbnail::Simple
+
+0.0005 Fri Jun 24 22:26:00 2011
+        - fixed upscaling of images
 

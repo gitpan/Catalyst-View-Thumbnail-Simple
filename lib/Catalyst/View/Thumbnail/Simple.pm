@@ -7,7 +7,7 @@ use base 'Catalyst::View';
 use Imager;
 use Image::Info qw/image_info/;
 
-our $VERSION = 0.0003;
+our $VERSION = 0.0005;
 
 sub process {
     my ($self, $c) = @_;
@@ -83,16 +83,29 @@ sub generate_thumbnail {
     $image->read( data => ${$c->stash->{image}}, 
                   type => $type, bytes => $max_size )
         or return 'Imager failed to read image: ' . $image->errstr;
-  
-    if ( $c->stash->{image_size} ) {
+    
+    my $size = $c->stash->{image_size};
+
+    my $height = $image->getheight;
+    my $width = $image->getwidth;
+
+    # get longest side to see if it needs to be scaled down
+    my $longest = $height > $width ? $height : $width;
+    
+    if ( $size && ( $size < $longest ) ) {
+        
+        # image needs to be scaled
         
         # amazing algorithm to find the longest side of the image and
         # pass the right parameter to Imager->scale
-        my $dimension = $image->getwidth > $image->getheight ? 
+        my $dimension = $width > $height ? 
             'xpixels' : 'ypixels';
 
-        my $new_image = $image->scale( $dimension => $c->stash->{image_size},
-                                       qtype => 'mixing' );
+        # scaling algo to use
+        my $qtype = $c->config->{'View::Thumbnail::Simple'}->{scaling_qtype} || 'mixing';
+
+        my $new_image = $image->scale( $dimension => $size,
+                                       qtype => $qtype );
         
         # return scaled image
         return $new_image;
@@ -104,7 +117,11 @@ sub generate_thumbnail {
 
 }
 
+1;
 
+__END__
+
+=pod
 
 =head1 NAME
 
@@ -127,10 +144,10 @@ thumbnailing images
 
 =head1 DESCRIPTION
 
-Another thumbnailer? Yes, but this one uses Imager and is arguably
-much simpler than the other ones out there (note the `Simple' in the
-package name). If you need complex thumbnailing like explicit X & Y
-values and cropping/zooming, please see L<Catalyst::View::Thumbnail>.
+Another thumbnailer? Yes, but this one uses Imager and is simpler than
+the other thumbnailers out there (note the `Simple' in the package
+name). If you need complex thumbnailing like explicit X & Y values and
+cropping/zooming, please see L<Catalyst::View::Thumbnail>.
 
 This module is a View class for Catalyst that will simply and
 efficiently create thumbnails or `scaled' versions of images using
@@ -160,8 +177,8 @@ be scaled accordingly, maintaining it's original aspect ratio.
 
 You can set this attribute to a string (e.g. `png') to try to force
 Imager to read or write an image of a certain file format (note that
-this may fail). Otherwise the image type is derived from the source
-image.
+this may fail). Otherwise the image type is automatically derived from
+the source image.
 
 =item max_image_size
 
