@@ -7,3 +7,6 @@ Revision history for Perl extension Catalyst::View::Thumbnail::Simple.
 0.0005 Fri Jun 24 22:26:00 2011
         - fixed upscaling of images
 
+0.0006 Thu Aug 4 21:07:06 2011
+        - add config option for jpegquality and doc changes
+

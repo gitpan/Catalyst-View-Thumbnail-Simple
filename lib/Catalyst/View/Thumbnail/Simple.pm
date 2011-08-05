@@ -7,7 +7,7 @@ use base 'Catalyst::View';
 use Imager;
 use Image::Info qw/image_info/;
 
-our $VERSION = 0.0005;
+our $VERSION = 0.0006;
 
 sub process {
     my ($self, $c) = @_;
@@ -23,44 +23,42 @@ sub process {
     my $image_info = image_info $c->stash->{image};
     my $mime_type = $image_info->{file_media_type};
 
-    # derive `imager acceptable' type from mime (e.g. `png' or `jpeg')
+    # get type that imager can accept like 'png'
     my $imager_type = $mime_type;
     $imager_type =~ s|^image/||;
 
     # default to a stashed type value
-    $imager_type = $c->stash->{image_type} || $imager_type;;
+    $imager_type = $c->stash->{image_type} || $imager_type;
+    
+    # quality of output
+    my $quality = $c->stash->{jpeg_quality} || 100;
 
     # generate thumbnail, returns imager object or an error string
     my $image = $self->generate_thumbnail($c, $imager_type);
-    
-    # return image in response
-    if ( ref $image ) {
 
+    if ( ref $image ) {
         # stash the imager object
         delete $c->stash->{image};
-        $c->stash( image => $image );
+        $c->stash->{image} = $image;
 
         # write image data to a scalar
         my $thumbnail;
         $image->write(
             data => \$thumbnail,
             type => $imager_type,
+            jpegquality => $quality
         );
         
         # stash raw image data
-        $c->stash( image_data => \$thumbnail );
+        $c->stash->{image_data} = \$thumbnail;
         
         # return image in response
         $c->response->content_type($mime_type);
         $c->response->body($thumbnail);
-
-    } 
-
-    else {
+    } else {
         # error out
         $c->error("Couldn't render image: $image");
         return 0;
-
     }
 
 }
@@ -79,7 +77,7 @@ sub generate_thumbnail {
         $c->config->{'View::Thumbnail::Simple'}->{max_image_size} || 15_728_640;
 
     # read image
-    my $image = Imager->new();
+    my $image = Imager->new;
     $image->read( data => ${$c->stash->{image}}, 
                   type => $type, bytes => $max_size )
         or return 'Imager failed to read image: ' . $image->errstr;
@@ -103,7 +101,6 @@ sub generate_thumbnail {
 
         # scaling algo to use
         my $qtype = $c->config->{'View::Thumbnail::Simple'}->{scaling_qtype} || 'mixing';
-
         my $new_image = $image->scale( $dimension => $size,
                                        qtype => $qtype );
         
@@ -189,6 +186,25 @@ your application's configuration like so:
     # example in YAML
     View::Thumbnail::Simple:
         max_image_size: 10_485_760
+
+=back
+
+=head2 Optional config parameters
+
+=over 
+
+=item max_image_size
+
+See above section about max_image_size
+
+=item scaling_qtype
+
+Pick what Imager scaling algo to use, defaults to 'mixing'. Please see
+the documentation on 'scale()' in L<Imager::Transformations>.
+
+=item jpeg_quality
+
+An integer between 0-100 used to determine the quality of the image when writing JPEG files, defaults to 100. Please see the JPEG section of L<Imager::Files>.
 
 =back
 
