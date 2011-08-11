@@ -5,39 +5,59 @@ use strict;
 use base 'Catalyst::View';
 
 use Imager;
-use Image::Info qw/image_info/;
+use Image::Info qw/image_info dim/;
 
-our $VERSION = 0.0007;
+our $VERSION = 0.0008;
 
 sub process {
     my ($self, $c) = @_;
 
+    my $stash = $c->stash;
+
     # check for image data
-    unless ( exists $c->stash->{image} ) {
+    unless ( exists $stash->{image} ) {
         $c->error( q{Image data missing from stash, please set 'image' key in} .
                    q{ stash to a scalar ref containing raw image data} );
         return $c->res->status(404);
     }
 
     # derive mime type for response
-    my $image_info = image_info $c->stash->{image};
+    my $image_info = image_info $stash->{image};
     my $mime_type = $image_info->{file_media_type};
+
+    # get size to see if we need to read it in
+    my ($w, $h) = dim($image_info);
+    my $longest = $w > $h ? $w : $h 
+        if $w && $h;
 
     # get type that imager can accept like 'png'
     my $imager_type = $mime_type;
     $imager_type =~ s|^image/||;
+    
+    # type to read image in as
+    my $read_type = $imager_type;
+    
+    # type to write image out as, use stashed value if available or read type
+    my $write_type = $stash->{image_type} || $read_type;
 
-    # default to a stashed type value
-    $imager_type = $c->stash->{image_type} || $imager_type;
+    # check if we need to force thumbnailing by force param or if the
+    # stashed image type is not the same as what we got from the image
+    my $force = 0;
+    $force = 1 if $stash->{force_read} || 
+        ($stash->{image_type} && $stash->{image_type} ne $imager_type);
+
     
     # quality of output
-    my $quality = $c->stash->{jpeg_quality} || 100;
-
+    my $quality = $stash->{jpeg_quality} || 100;
+    my $size = $stash->{image_size};
+    
     my $image = undef;
-
-    if (exists $c->stash->{image_size}) {
-        # generate thumbnail, returns imager object or an error string
-        $image = $self->generate_thumbnail($c, $imager_type);
+    
+    if ( ($size && (!($size >= $longest))) || $force) {
+        # if a size is available and it isn't greater than the longest
+        # side of the image or there is a force param then generate
+        # the thumbnail, returns imager object or an error string
+        $image = $self->generate_thumbnail($c, $read_type);
     } else {
         # if it doesnt need to be scaled just return it
         $c->stash->{image_data} = $c->stash->{image};
@@ -45,7 +65,9 @@ sub process {
         return $c->response->body(${ $c->stash->{image} });
     }
 
-    if ( ref $image ) {
+    if (ref $image) {
+        # image got scaled or read in at least
+
         # stash the imager object
         delete $c->stash->{image};
         $c->stash->{image} = $image;
@@ -54,7 +76,7 @@ sub process {
         my $thumbnail;
         $image->write(
             data => \$thumbnail,
-            type => $imager_type,
+            type => $write_type,
             jpegquality => $quality
         );
         
@@ -100,7 +122,6 @@ sub generate_thumbnail {
     my $longest = $height > $width ? $height : $width;
     
     if ( $size && ( $size < $longest ) ) {
-        
         # image needs to be scaled
         
         # amazing algorithm to find the longest side of the image and
@@ -115,7 +136,6 @@ sub generate_thumbnail {
         
         # return scaled image
         return $new_image;
-
     }
     
     # return unchanged image
@@ -182,9 +202,9 @@ be scaled accordingly, maintaining it's original aspect ratio.
 =item image_type
 
 You can set this attribute to a string (e.g. `png') to try to force
-Imager to read or write an image of a certain file format (note that
-this may fail). Otherwise the image type is automatically derived from
-the source image.
+Imager to write an image of a certain file format (note that this may
+fail). Otherwise the image type is automatically derived from the
+source image.
 
 =item max_image_size
 
@@ -195,6 +215,19 @@ your application's configuration like so:
     # example in YAML
     View::Thumbnail::Simple:
         max_image_size: 10_485_760
+
+=item force_read
+
+This module will avoid reading & writing image data out unless an
+image_size value is available in the stash and it is less than the
+size of the longest side of the image data to be scaled. This is done
+to avoid unnecessary image compression (loss of quality). If you want
+to force this module to read and write the image data regardless of
+these variables (e.g. if you wanted to transcode it to another file
+format), either set this stash value to a true value or set the
+'image_type' stash value to an Imager acceptable file extension
+(e.g. 'jpeg') that is different than the type of the current stashed
+image data.
 
 =back
 

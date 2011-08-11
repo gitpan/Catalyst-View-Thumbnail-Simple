@@ -13,3 +13,10 @@ Revision history for Perl extension Catalyst::View::Thumbnail::Simple.
 0.0007 Thu Aug 11 00:05:28 2011
         - dont read in image if not scaling
 
+0.0008 Thu Aug 11 01:49:24 2011
+       - added the following checks to see if thumbnailing is necessary or not:
+           - if image_size param is available and is less than the longest side of the stashed image data
+           - if a force_read param is available
+           - if image_type is available and it is different than the stashed image data's type
+       - doc fixes
+
