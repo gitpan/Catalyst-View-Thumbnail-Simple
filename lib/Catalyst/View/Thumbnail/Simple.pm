@@ -7,7 +7,7 @@ use base 'Catalyst::View';
 use Imager;
 use Image::Info qw/image_info/;
 
-our $VERSION = 0.0006;
+our $VERSION = 0.0007;
 
 sub process {
     my ($self, $c) = @_;
@@ -33,8 +33,17 @@ sub process {
     # quality of output
     my $quality = $c->stash->{jpeg_quality} || 100;
 
-    # generate thumbnail, returns imager object or an error string
-    my $image = $self->generate_thumbnail($c, $imager_type);
+    my $image = undef;
+
+    if (exists $c->stash->{image_size}) {
+        # generate thumbnail, returns imager object or an error string
+        $image = $self->generate_thumbnail($c, $imager_type);
+    } else {
+        # if it doesnt need to be scaled just return it
+        $c->stash->{image_data} = $c->stash->{image};
+        $c->response->content_type($mime_type);
+        return $c->response->body(${ $c->stash->{image} });
+    }
 
     if ( ref $image ) {
         # stash the imager object
