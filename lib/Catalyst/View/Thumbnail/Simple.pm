@@ -7,7 +7,7 @@ use base 'Catalyst::View';
 use Imager;
 use Image::Info qw/image_info dim/;
 
-our $VERSION = 0.0008;
+our $VERSION = 0.0009;
 
 sub process {
     my ($self, $c) = @_;
@@ -84,7 +84,7 @@ sub process {
         $c->stash->{image_data} = \$thumbnail;
         
         # return image in response
-        $c->response->content_type($mime_type);
+        $c->response->content_type('image/' . $write_type);
         $c->response->body($thumbnail);
     } else {
         # error out
@@ -170,15 +170,12 @@ thumbnailing images
 
 =head1 DESCRIPTION
 
-Another thumbnailer? Yes, but this one uses Imager and is simpler than
-the other thumbnailers out there (note the `Simple' in the package
-name). If you need complex thumbnailing like explicit X & Y values and
-cropping/zooming, please see L<Catalyst::View::Thumbnail>.
-
 This module is a View class for Catalyst that will simply and
-efficiently create thumbnails or `scaled' versions of images using
-arguably the most sane image manipulation library, `Imager'. The
-behavior of this module is controlled purely by stash values.
+efficiently create 'thumbnails' or scaled down versions of images
+using arguably the most sane image manipulation library,
+L<Imager>. The behavior of this module is controlled purely by stash
+values.  If you need complex thumbnailing like explicit X & Y values
+and cropping/zooming, please see L<Catalyst::View::Thumbnail>.
 
 =head2 Required stash attributes
 
@@ -201,7 +198,7 @@ be scaled accordingly, maintaining it's original aspect ratio.
 
 =item image_type
 
-You can set this attribute to a string (e.g. `png') to try to force
+You can set this attribute to a string (e.g. 'png') to try to force
 Imager to write an image of a certain file format (note that this may
 fail). Otherwise the image type is automatically derived from the
 source image.
@@ -250,7 +247,7 @@ An integer between 0-100 used to determine the quality of the image when writing
 
 =back
 
-=head2 `Returned' stash attributes
+=head2 'Returned' stash attributes
 
 After generating the thumbnail from the image data, the following
 stash values will be set:

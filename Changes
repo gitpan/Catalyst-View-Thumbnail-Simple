@@ -20,3 +20,6 @@ Revision history for Perl extension Catalyst::View::Thumbnail::Simple.
            - if image_type is available and it is different than the stashed image data's type
        - doc fixes
 
+0.0009 Fri Feb 24 20:23:00 2012
+       - use proper content type when transcoding images
+

@@ -1,6 +1,9 @@
 Changes
-Makefile.PL
+LICENSE
 MANIFEST
+META.yml
+Makefile.PL
 README
-t/Catalyst-View-Thumbnail-Simple.t
+dist.ini
 lib/Catalyst/View/Thumbnail/Simple.pm
+t/Catalyst-View-Thumbnail-Simple.t

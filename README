@@ -1,44 +1,14 @@
-Catalyst-View-Thumbnail-Simple version 0.0008
-===========================================
 
-This module is a View class for Catalyst that will simply and
-efficiently create thumbnails or `scaled' versions of images.
 
-See `perldoc Catalyst::View::Thumbnail::Simple' for usage information.
+This archive contains the distribution Catalyst-View-Thumbnail-Simple,
+version 0.0009:
 
-INSTALLATION
+  Simple Catalyst view class for
+thumbnailing images
 
-To install this module type the following:
+This software is copyright (c) 2012 by aesop.
 
-   perl Makefile.PL
-   make
-   make test
-   make install
-
-DEPENDENCIES
-
-This module requires these other modules and libraries:
-
-  Catalyst::View
-  Imager
-  Image::Info
-
-Note that Imager requires several libraries (e.g. libpng, libjpeg) for
-the ability to read some image file types. If you are unsure if you
-have these dependencies installed, type the following in your command
-shell to reveal what image types your version of Imager can currently
-read:
-
-  perl -MImager -e 'print join(q{, }, Imager->read_types) . qq{\n}'
-
-See the Imager perldocs for more information on image formats.
-
-COPYRIGHT AND LICENCE
-
-Copyright (C) 2011 by <aesop@cpan.org>
-
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.10.1 or,
-at your option, any later version of Perl 5 you may have available.
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
 
 
