@@ -24,7 +24,7 @@ my %WriteMakefileArgs = (
     "Image::Info" => 0,
     "Imager" => 0
   },
-  "VERSION" => "0.0009",
+  "VERSION" => "0.0010",
   "test" => {
     "TESTS" => "t/*.t"
   }

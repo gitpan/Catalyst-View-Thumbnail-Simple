@@ -23,3 +23,6 @@ Revision history for Perl extension Catalyst::View::Thumbnail::Simple.
 0.0009 Fri Feb 24 20:23:00 2012
        - use proper content type when transcoding images
 
+0.0010 Thu Jul 26 07:16:41 2012
+       - add simple square cropping feature, small doc fixes
+

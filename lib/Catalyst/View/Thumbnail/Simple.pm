@@ -2,22 +2,22 @@ package Catalyst::View::Thumbnail::Simple;
 
 use warnings;
 use strict;
-use base 'Catalyst::View';
-
 use Imager;
 use Image::Info qw/image_info dim/;
+use base 'Catalyst::View';
 
-our $VERSION = 0.0009;
+our $VERSION = 0.0010;
 
 sub process {
     my ($self, $c) = @_;
 
     my $stash = $c->stash;
+    my $res = $c->res;
 
     # check for image data
-    unless ( exists $stash->{image} ) {
-        $c->error( q{Image data missing from stash, please set 'image' key in} .
-                   q{ stash to a scalar ref containing raw image data} );
+    unless (exists $stash->{image}) {
+        $c->error(q{Image data missing from stash, please set 'image' key in} .
+                   q{ stash to a scalar ref containing raw image data});
         return $c->res->status(404);
     }
 
@@ -25,52 +25,62 @@ sub process {
     my $image_info = image_info $stash->{image};
     my $mime_type = $image_info->{file_media_type};
 
-    # get size to see if we need to read it in
     my ($w, $h) = dim($image_info);
-    my $longest = $w > $h ? $w : $h 
-        if $w && $h;
+    my $longest = (sort { $a < $b } ($h, $w))[0];
+    my $size = $stash->{image_size};
+    my $square = $stash->{square};
 
     # get type that imager can accept like 'png'
     my $imager_type = $mime_type;
     $imager_type =~ s|^image/||;
     
-    # type to read image in as
     my $read_type = $imager_type;
-    
-    # type to write image out as, use stashed value if available or read type
     my $write_type = $stash->{image_type} || $read_type;
 
-    # check if we need to force thumbnailing by force param or if the
-    # stashed image type is not the same as what we got from the image
-    my $force = 0;
-    $force = 1 if $stash->{force_read} || 
-        ($stash->{image_type} && $stash->{image_type} ne $imager_type);
+    # find out if image needs to be processed at all
+    my $should_thumbnail = 0;
+    
+    # size is smaller than longest side
+    $should_thumbnail = 1
+        if ($size && ($size < $longest));
+    
+    # need to crop image
+    $should_thumbnail = 1
+        if ($square && ($w != $h));
 
-    
-    # quality of output
-    my $quality = $stash->{jpeg_quality} || 100;
-    my $size = $stash->{image_size};
-    
+    # write type is different than read type
+    $should_thumbnail = 1
+        if ($write_type ne $imager_type);
+
+    # force param
+    $should_thumbnail = 1
+        if $stash->{force_read};
+
+
     my $image = undef;
     
-    if ( ($size && (!($size >= $longest))) || $force) {
-        # if a size is available and it isn't greater than the longest
-        # side of the image or there is a force param then generate
-        # the thumbnail, returns imager object or an error string
+    if ($should_thumbnail) {
+        # generate thumbnail
         $image = $self->generate_thumbnail($c, $read_type);
     } else {
-        # if it doesnt need to be scaled just return it
-        $c->stash->{image_data} = $c->stash->{image};
-        $c->response->content_type($mime_type);
-        return $c->response->body(${ $c->stash->{image} });
+        # just return it as is
+        $stash->{image_data} = $stash->{image};
+        $res->content_type($mime_type);
+        return $res->body(
+            ${ $c->stash->{image} }
+        );
     }
+
 
     if (ref $image) {
         # image got scaled or read in at least
 
         # stash the imager object
-        delete $c->stash->{image};
-        $c->stash->{image} = $image;
+        delete $stash->{image};
+        $stash->{image} = $image;
+        
+        # quality of output
+        my $quality = $stash->{jpeg_quality} || 100;
 
         # write image data to a scalar
         my $thumbnail;
@@ -81,11 +91,11 @@ sub process {
         );
         
         # stash raw image data
-        $c->stash->{image_data} = \$thumbnail;
+        $stash->{image_data} = \$thumbnail;
         
         # return image in response
-        $c->response->content_type('image/' . $write_type);
-        $c->response->body($thumbnail);
+        $res->content_type('image/' . $write_type);
+        $res->body($thumbnail);
     } else {
         # error out
         $c->error("Couldn't render image: $image");
@@ -99,40 +109,56 @@ sub generate_thumbnail {
     my ($self, $c, $type) = @_;
 
     # check type
-    return ( 'Unable to derive image type from image data, set the correct ' . 
-             '$c->stash->{type} accordingly to one of the following values: ' . 
-             join(', ', Imager->read_types) ) unless $type;
+    return 'Unable to derive image type from image data, your version of ' .
+        'Imager can read in the following image types: ' . 
+        join(', ', Imager->read_types) unless $type;
     
+    my $stash = $c->stash;
+    my $config = $c->config->{'View::Thumbnail::Simple'} || {};
+
     # max image size allowed, defaults to 15 mb
-    my $max_size = $c->stash->{max_image_size} || 
-        $c->config->{'View::Thumbnail::Simple'}->{max_image_size} || 15_728_640;
+    my $max_size = $stash->{max_image_size} || 
+        $config->{max_image_size} || 15_728_640;
 
     # read image
     my $image = Imager->new;
-    $image->read( data => ${$c->stash->{image}}, 
-                  type => $type, bytes => $max_size )
-        or return 'Imager failed to read image: ' . $image->errstr;
+    $image->read( 
+        data => ${$stash->{image}}, 
+        type => $type, 
+        bytes => $max_size 
+    ) or return 'Imager failed to read image: ' . $image->errstr;
     
-    my $size = $c->stash->{image_size};
-
+    my $size = $stash->{image_size};
+    my $square = $stash->{square};
     my $height = $image->getheight;
     my $width = $image->getwidth;
 
-    # get longest side to see if it needs to be scaled down
-    my $longest = $height > $width ? $height : $width;
+    my ($longest, $shortest) = sort { $a < $b } ($height, $width);
+
+    if ($square && ($height != $width)) {
+        # crop
+        $image = $image->crop(
+            width => $shortest,
+            height => $shortest
+        );
+
+        $height = $width = $longest = $shortest;
+    }
+
     
-    if ( $size && ( $size < $longest ) ) {
+    if ($size && ($size < $longest)) {
         # image needs to be scaled
-        
-        # amazing algorithm to find the longest side of the image and
+
         # pass the right parameter to Imager->scale
         my $dimension = $width > $height ? 
             'xpixels' : 'ypixels';
 
         # scaling algo to use
-        my $qtype = $c->config->{'View::Thumbnail::Simple'}->{scaling_qtype} || 'mixing';
-        my $new_image = $image->scale( $dimension => $size,
-                                       qtype => $qtype );
+        my $qtype = $config->{scaling_qtype} || 'mixing';
+        my $new_image = $image->scale( 
+            $dimension => $size,
+            qtype => $qtype 
+        );
         
         # return scaled image
         return $new_image;
@@ -165,17 +191,37 @@ thumbnailing images
     # in your controller
 
     my $raw_image_data = $image->data;
-    $c->stash( image => \$raw_image_data, image_size => 150 );
+
+    # scale
+    $c->stash( 
+        image => \$raw_image_data, 
+        image_size => 150 
+    );
     $c->forward('View::Thumbnailer');
+
+
+    # crop into a square and scale
+    $c->stash( 
+        image => \$raw_image_data, 
+        image_size => 300, 
+        square => 1 
+    );
+    $c->forward('View::Thumbnailer');
+
+    # scale and transcode image to png
+    $c->stash(
+        image => \$raw_image_data,
+        image_size => 150,
+        image_type => 'png'
+    );
 
 =head1 DESCRIPTION
 
 This module is a View class for Catalyst that will simply and
 efficiently create 'thumbnails' or scaled down versions of images
-using arguably the most sane image manipulation library,
-L<Imager>. The behavior of this module is controlled purely by stash
-values.  If you need complex thumbnailing like explicit X & Y values
-and cropping/zooming, please see L<Catalyst::View::Thumbnail>.
+using arguably the most sane perl image manipulation library,
+Imager. The behavior of this module is controlled by stash and config
+values.
 
 =head2 Required stash attributes
 
@@ -203,6 +249,12 @@ Imager to write an image of a certain file format (note that this may
 fail). Otherwise the image type is automatically derived from the
 source image.
 
+=item square
+
+Set this to true to cause the image to be cropped into a square. See
+crop() in L<Imager::Transformations>. Note that this takes place
+before the image is scaled (if image_size is available).
+
 =item max_image_size
 
 An integer in bytes of the largest size of image you want Imager to
@@ -215,16 +267,12 @@ your application's configuration like so:
 
 =item force_read
 
-This module will avoid reading & writing image data out unless an
-image_size value is available in the stash and it is less than the
-size of the longest side of the image data to be scaled. This is done
-to avoid unnecessary image compression (loss of quality). If you want
+This module will avoid reading in image data unless necessary for
+scaling, cropping or transcoding (if the stash values are set,
+original image dimensions are checked as well as type).  This is done
+to avoid unnecessary re-compression and loss of quality. If you want
 to force this module to read and write the image data regardless of
-these variables (e.g. if you wanted to transcode it to another file
-format), either set this stash value to a true value or set the
-'image_type' stash value to an Imager acceptable file extension
-(e.g. 'jpeg') that is different than the type of the current stashed
-image data.
+these variables, set this stash key to a true value.
 
 =back
 
@@ -247,7 +295,7 @@ An integer between 0-100 used to determine the quality of the image when writing
 
 =back
 
-=head2 'Returned' stash attributes
+=head2 Returned stash attributes
 
 After generating the thumbnail from the image data, the following
 stash values will be set:
